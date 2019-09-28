@@ -204,16 +204,17 @@ if($_POST) {
 				// having a name for the table in two cases, all small caps and capitalised
 				$capital = ucfirst($table[0]);
 				$small = strtolower($table[0]);
+				$table_name = $table[0];
 
 				// collecting the contents for the table main page tableName.php
 				$show = "<?php
 				include \"includes/header.php\";
 				?>
 
-				<a class=\"btn btn-primary\" href=\"edit-".$small.".php?act=add\"> <i class=\"glyphicon glyphicon-plus-sign\"></i> Add New " . $capital . "</a>
+				<a class=\"btn btn-primary\" href=\"edit-".$table_name.".php?act=add\"> <i class=\"glyphicon glyphicon-plus-sign\"></i> Add New " . $capital . "</a>
 
 				<h1>" . $capital . "</h1>
-				<p>This table includes <?php echo counting(\"".$small."\", \"id\");?> ".$small.".</p>
+				<p>This table includes <?php echo counting(\"".$table_name."\", \"id\");?> ".$table_name.".</p>
 
 				<table id=\"sorted\" class=\"table table-striped table-bordered\">
 				<thead>
@@ -227,34 +228,34 @@ if($_POST) {
 				$"."act = $"."_GET['act'];
 				if($"."act == \"edit\"){
 					$"."id = $"."_GET['id'];
-					$".$small." = getById(\"".$small."\", $"."id);
+					$".$table_name." = getById(\"".$table_name."\", $"."id);
 				}
 				?>
 
 				<form method=\"post\" action=\"save.php\" enctype='multipart/form-data'>
 					<fieldset>
 						<legend class=\"hidden-first\">Add New ".$capital."</legend>
-						<input name=\"cat\" type=\"hidden\" value=\"".$small."\">
+						<input name=\"cat\" type=\"hidden\" value=\"".$table_name."\">
 						<input name=\"id\" type=\"hidden\" value=\"<?=$"."id?>\">
 						<input name=\"act\" type=\"hidden\" value=\"<?=$"."act?>\">
 				";
 
 				// continue the save page
 				$save .= "
-				if($"."cat == \"".$small."\" || $"."cat_get == \"".$small."\"){
+				if($"."cat == \"".$table_name."\" || $"."cat_get == \"".$table_name."\"){
 					";
 
 				// continue the home page
 				$index .= "
 				<tr>
-					<td><a href=\"" . $small . ".php\">" . $capital . "</a></td>
-					<td><?=counting(\"" . $small . "\", \"id\")?></td>
+					<td><a href=\"" . $table_name . ".php\">" . $capital . "</a></td>
+					<td><?=counting(\"" . $table_name . "\", \"id\")?></td>
 				</tr>
 				";
 
 				// continue the sidebar in header
 				$icon = random_glyphicon();
-				$header .= "<li><a href=\"" . $small . ".php\"> <i class=\"glyphicon glyphicon-".$icon."\"></i>" . $capital . " <span class=\"pull-right\"><?=counting(\"" . $small . "\", \"id\")?></span></a></li>\n";
+				$header .= "<li><a href=\"" . $table_name . ".php\"> <i class=\"glyphicon glyphicon-".$icon."\"></i>" . $capital . " <span class=\"pull-right\"><?=counting(\"" . $table_name . "\", \"id\")?></span></a></li>\n";
 
 
 				// finding all the columns in a table
@@ -265,7 +266,7 @@ if($_POST) {
 				while ($col = mysqli_fetch_array($row)){
 					// data for the table in the show page tableName.php 
 					$head .= "		\t<th>" . ucfirst(str_replace("_", " ", $col[0])) . "</th>\n";
-					$body .= "	\t<td><?php echo $".$small."s['" . $col[0] . "']?></td>\n";
+					$body .= "	\t<td><?php echo $".$table_name."s['" . $col[0] . "']?></td>\n";
 
 					if($col[3] != "PRI"){
 						if($col[1] == "text"){
@@ -273,13 +274,13 @@ if($_POST) {
 							// continue the edit page with a text area for a type text column
 							$edit .= "
 							<label>" . ucfirst(str_replace("_", " ", $col[0])) . "</label>
-							<textarea class=\"ckeditor form-control\" name=\"" . $col[0] . "\"><?=$".$small."['" . $col[0] . "']?></textarea><br>
+							<textarea class=\"ckeditor form-control\" name=\"" . $col[0] . "\"><?=$".$table_name."['" . $col[0] . "']?></textarea><br>
 							";
 						} else {
 							// continue the edit page with an input field
 							$edit .= "
 							<label>" . ucfirst(str_replace("_", " ", $col[0])) . "</label>
-							<input class=\"form-control\" type=\"text\" name=\"" . $col[0] . "\" value=\"<?=$".$small."['" . $col[0] . "']?>\" /><br>
+							<input class=\"form-control\" type=\"text\" name=\"" . $col[0] . "\" value=\"<?=$".$table_name."['" . $col[0] . "']?>\" /><br>
 							";
 						}
 					}
@@ -287,7 +288,7 @@ if($_POST) {
 					// check if the column is not the ID to create the corresponding save and insert data
 					if ($col[0] != 'id'){
 
-						$save .= "$" . $col[0] . " = mysqli_real_escape_string($"."_POST[\"" . $col[0] . "\"]);\n";
+						$save .= "$" . $col[0] . " = mysqli_real_escape_string($" . "link, $"."_POST[\"" . $col[0] . "\"]);\n";
 
 						$insert .= " `" . $col[0] . "` ,";
 
@@ -313,8 +314,8 @@ if($_POST) {
 				// show page central part
 				$mid = "
 				<?php
-				$".$small." = getAll(\"".$small."\");
-				if($".$small.") foreach ($".$small." as $".$small."s):
+				$".$table_name." = getAll(\"".$table_name."\");
+				if($".$table_name.") foreach ($".$table_name." as $".$table_name."s):
 					?>
 					<tr>";
 
@@ -324,8 +325,8 @@ if($_POST) {
 				$show .= $mid."\n";
 				$show .= $body."\n";
 				$show .= "
-						<td><a href=\"edit-".$small.".php?act=edit&id=<?php echo $".$small."s['id']?>\"><i class=\"glyphicon glyphicon-edit\"></i></a></td>
-						<td><a href=\"save.php?act=delete&id=<?php echo $".$small."s['id']?>&cat=".$small."\" onclick=\"return navConfirm(this.href);\"><i class=\"glyphicon glyphicon-trash\"></i></a></td>
+						<td><a href=\"edit-".$table_name.".php?act=edit&id=<?php echo $".$table_name."s['id']?>\"><i class=\"glyphicon glyphicon-edit\"></i></a></td>
+						<td><a href=\"save.php?act=delete&id=<?php echo $".$table_name."s['id']?>&cat=".$table_name."\" onclick=\"return navConfirm(this.href);\"><i class=\"glyphicon glyphicon-trash\"></i></a></td>
 						</tr>
 					<?php endforeach; ?>
 					</table>
@@ -342,33 +343,33 @@ if($_POST) {
 				$save .= "
 
 				if($"."act == \"add\"){
-					mysqli_query(\$link, \"INSERT INTO `".$small."` ( ".removeLastChar($insert).") VALUES (".removeLastChar($values).") \");
+					mysqli_query(\$link, \"INSERT INTO `".$table_name."` ( ".removeLastChar($insert).") VALUES (".removeLastChar($values).") \");
 				}elseif ($"."act == \"edit\"){
-					mysqli_query(\$link, \"UPDATE `".$small."` SET ".removeLastChar($update)." WHERE `id` = '\".$"."id.\"' \"); ";
+					mysqli_query(\$link, \"UPDATE `".$table_name."` SET ".removeLastChar($update)." WHERE `id` = '\".$"."id.\"' \"); ";
 
 				if($attach_password == 1){
 					$save .= "
 					if($"."_POST[\"password\"] && $"."_POST[\"password\"] != \"\"){
-						mysqli_query(\$link, \"UPDATE `".$small."` SET  `password` =  '\".md5($"."password).\"' WHERE `id` = '\".$"."id.\"' \");
+						mysqli_query(\$link, \"UPDATE `".$table_name."` SET  `password` =  '\".md5($"."password).\"' WHERE `id` = '\".$"."id.\"' \");
 					}
 					";
 				}
 
 				$save .= "	
 					}elseif ($"."act_get == \"delete\"){
-						mysqli_query(\$link, \"DELETE FROM `".$small."` WHERE id = '\".$"."id_get.\"' \");
+						mysqli_query(\$link, \"DELETE FROM `".$table_name."` WHERE id = '\".$"."id_get.\"' \");
 					}
-					header(\"location:\".\"".$small.".php\");
+					header(\"location:\".\"".$table_name.".php\");
 				}
 				";
 
 				// creating the show page tableName.php
-				createFile($database, $small, $show);
-				$message .= "<li>Created page: ".$small.".php</li>";
+				createFile($database, $table_name, $show);
+				$message .= "<li>Created page: ".$table_name.".php</li>";
 
 				// creating the edit page edit-tableName.php
-				createFile($database, "edit-".$small, $edit);
-				$message .= "<li>Created page: edit-".$small.".php</li>";
+				createFile($database, "edit-".$table_name, $edit);
+				$message .= "<li>Created page: edit-".$table_name.".php</li>";
 
 				// empty all variables
 				$head = "";
