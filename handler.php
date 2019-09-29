@@ -102,12 +102,16 @@ if($_POST) {
 			die(json_encode(array('status' => 'error','message'=> 'Couldn\'t select table: ' . mysqli_error($link))));
 		}
 
+		// split the list of tables to those that have a primary key to employ as the id and those that do not have
+		$loop_no_key_tables = array();
+
 		// the generation process starts here
 		// collecting DB connection info to generate includes/connect.php file
 		$connection = "<?php
 		\$link = mysqli_connect(\"$host\", \"$username\", \"$password\");
 		mysqli_select_db(\$link, \"$database\");  
 		mysqli_query(\$link, \"SET CHARACTER SET utf8\");
+		session_start();
 		?>
 		";
 
@@ -137,7 +141,6 @@ if($_POST) {
 
 		// collecting data for the includes/header.php page which is the header of all pages
 		$header = '<?php
-		session_start();
 		if ($_COOKIE["auth"] != "admin_in"){header("location:"."./");}
 			include("includes/connect.php");
 			include("includes/data.php");
@@ -200,21 +203,60 @@ if($_POST) {
 
 			// looping all the database tables
 			while($table = mysqli_fetch_array($loop)){
+				$attach_password = 0;
+				$head = "";
+				$body = "";
+
+				$insert = "";
+				$values = "";
+				$update = "";
+
 
 				// having a name for the table in two cases, all small caps and capitalised
 				$capital = ucfirst($table[0]);
 				$small = strtolower($table[0]);
 				$table_name = $table[0];
 
+				// create pages for the tbales with primary key(s)
+				$pkquery = mysqli_query($link, "SELECT column_name AS primary_key
+					FROM information_schema.KEY_COLUMN_USAGE
+					WHERE TABLE_NAME = '".$table_name."' AND 
+					    CONSTRAINT_NAME = 'PRIMARY'");
+				$pkrow = mysqli_fetch_assoc($pkquery);
+				$pkname = $pkrow['primary_key'];
+
+				if (!$pkname) {
+					$loop_no_key_tables[] = $table_name;
+					continue;
+				}
+
 				// collecting the contents for the table main page tableName.php
 				$show = "<?php
 				include \"includes/header.php\";
 				?>
 
-				<a class=\"btn btn-primary\" href=\"edit-".$table_name.".php?act=add\"> <i class=\"glyphicon glyphicon-plus-sign\"></i> Add New " . $capital . "</a>
+				<div>
+					<a class=\"btn btn-primary\" href=\"edit-".$table_name.".php?act=add\" style=\"float: right; margin-top=20px;\"> <i class=\"glyphicon glyphicon-plus-sign\"></i> Add New " . $capital . "</a>
 
-				<h1>" . $capital . "</h1>
-				<p>This table includes <?php echo counting(\"".$table_name."\", \"id\");?> ".$table_name.".</p>
+					<h1>" . $capital . "</h1>
+					<?php if (isset($"."_SESSION['success'])): 
+						if ($"."_SESSION['success']):	
+							$"."alertclass = 'alert-success';
+							$"."alertcaption = 'Success! ';
+						elseif (!$"."_SESSION['success']): 
+							$"."alertclass = 'alert-danger';
+							$"."alertcaption = 'Oops! '; ?>
+					<?php endif; ?>
+					<div class=\"alert <?php echo $"."alertclass; ?> alert-dismissible\" role=\"alert\">
+					  <button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button>
+					  <strong><?php echo $"."alertcaption; ?> </strong> <?php echo $"."_SESSION['message']; ?>
+					</div>
+					<?php unset($"."_SESSION['success']);
+						unset($"."_SESSION['message']);
+					endif; ?>
+				</div>
+
+				<p>This table includes <?php echo counting(\"".$table_name."\", \"".$pkname."\");?> ".$table_name.".</p>
 
 				<table id=\"sorted\" class=\"table table-striped table-bordered\">
 				<thead>
@@ -227,8 +269,8 @@ if($_POST) {
 
 				$"."act = $"."_GET['act'];
 				if($"."act == \"edit\"){
-					$"."id = $"."_GET['id'];
-					$".$table_name." = getById(\"".$table_name."\", $"."id);
+					$".$pkname." = $"."_GET['".$pkname."'];
+					$".$table_name." = getById(\"".$table_name."\", $".$pkname.", '".$pkname."');
 				}
 				?>
 
@@ -236,7 +278,7 @@ if($_POST) {
 					<fieldset>
 						<legend class=\"hidden-first\">Add New ".$capital."</legend>
 						<input name=\"cat\" type=\"hidden\" value=\"".$table_name."\">
-						<input name=\"id\" type=\"hidden\" value=\"<?=$"."id?>\">
+						<input name=\"".$pkname."\" type=\"hidden\" value=\"<?=$".$pkname."?>\">
 						<input name=\"act\" type=\"hidden\" value=\"<?=$"."act?>\">
 				";
 
@@ -249,13 +291,13 @@ if($_POST) {
 				$index .= "
 				<tr>
 					<td><a href=\"" . $table_name . ".php\">" . $capital . "</a></td>
-					<td><?=counting(\"" . $table_name . "\", \"id\")?></td>
+					<td><?=counting(\"" . $table_name . "\", \"".$pkname."\")?></td>
 				</tr>
 				";
 
 				// continue the sidebar in header
 				$icon = random_glyphicon();
-				$header .= "<li><a href=\"" . $table_name . ".php\"> <i class=\"glyphicon glyphicon-".$icon."\"></i>" . $capital . " <span class=\"pull-right\"><?=counting(\"" . $table_name . "\", \"id\")?></span></a></li>\n";
+				$header .= "<li><a href=\"" . $table_name . ".php\"> <i class=\"glyphicon glyphicon-".$icon."\"></i>" . $capital . " <span class=\"pull-right\"><?=counting(\"" . $table_name . "\", \"".$pkname."\")?></span></a></li>\n";
 
 
 				// finding all the columns in a table
@@ -286,7 +328,7 @@ if($_POST) {
 					}
 
 					// check if the column is not the ID to create the corresponding save and insert data
-					if ($col[0] != 'id'){
+					if ($col[0] != $pkname){
 
 						$save .= "$" . $col[0] . " = mysqli_real_escape_string($" . "link, $"."_POST[\"" . $col[0] . "\"]);\n";
 
@@ -303,6 +345,12 @@ if($_POST) {
 					}
 
 				} // end row loop
+
+				// insert the primary key selector
+				$save .= "\n";
+				$save .= "$"."pkname = $"."_POST['".$pkname."']; \n";
+				$save .= "$"."pkname_get = $"."_GET['".$pkname."']; \n\n";
+				$save .= "\n$"."ret;\n\n";
 
 				// continue show page top part
 				$head .= "
@@ -325,8 +373,8 @@ if($_POST) {
 				$show .= $mid."\n";
 				$show .= $body."\n";
 				$show .= "
-						<td><a href=\"edit-".$table_name.".php?act=edit&id=<?php echo $".$table_name."s['id']?>\"><i class=\"glyphicon glyphicon-edit\"></i></a></td>
-						<td><a href=\"save.php?act=delete&id=<?php echo $".$table_name."s['id']?>&cat=".$table_name."\" onclick=\"return navConfirm(this.href);\"><i class=\"glyphicon glyphicon-trash\"></i></a></td>
+						<td><a href=\"edit-".$table_name.".php?act=edit&".$pkname."=<?php echo $".$table_name."s['".$pkname."']?>\"><i class=\"glyphicon glyphicon-edit\"></i></a></td>
+						<td><a href=\"save.php?act=delete&".$pkname."=<?php echo $".$table_name."s['".$pkname."']?>&cat=".$table_name."\" onclick=\"return navConfirm(this.href);\"><i class=\"glyphicon glyphicon-trash\"></i></a></td>
 						</tr>
 					<?php endforeach; ?>
 					</table>
@@ -343,21 +391,21 @@ if($_POST) {
 				$save .= "
 
 				if($"."act == \"add\"){
-					mysqli_query(\$link, \"INSERT INTO `".$table_name."` ( ".removeLastChar($insert).") VALUES (".removeLastChar($values).") \");
+					$"."ret = mysqli_query(\$link, \"INSERT INTO `".$table_name."` ( ".removeLastChar($insert).") VALUES (".removeLastChar($values).") \");
 				}elseif ($"."act == \"edit\"){
-					mysqli_query(\$link, \"UPDATE `".$table_name."` SET ".removeLastChar($update)." WHERE `id` = '\".$"."id.\"' \"); ";
+					$"."ret = mysqli_query(\$link, \"UPDATE `".$table_name."` SET ".removeLastChar($update)." WHERE `".$pkname."` = '\".$"."pkname.\"' \"); ";
 
 				if($attach_password == 1){
 					$save .= "
 					if($"."_POST[\"password\"] && $"."_POST[\"password\"] != \"\"){
-						mysqli_query(\$link, \"UPDATE `".$table_name."` SET  `password` =  '\".md5($"."password).\"' WHERE `id` = '\".$"."id.\"' \");
+						$"."ret = mysqli_query(\$link, \"UPDATE `".$table_name."` SET  `password` =  '\".md5($"."password).\"' WHERE `".$pkname."` = '\".$"."pkname_get.\"' \");
 					}
 					";
 				}
 
 				$save .= "	
 					}elseif ($"."act_get == \"delete\"){
-						mysqli_query(\$link, \"DELETE FROM `".$table_name."` WHERE id = '\".$"."id_get.\"' \");
+						$"."ret = mysqli_query(\$link, \"DELETE FROM `".$table_name."` WHERE ".$pkname." = '\".$"."pkname_get.\"' \");
 					}
 					header(\"location:\".\"".$table_name.".php\");
 				}
@@ -381,6 +429,14 @@ if($_POST) {
 
 			} //end table loop
 
+			$save .= "
+				if (!$"."ret) {
+					$"."_SESSION['message'] = mysqli_error($"."link);
+					$"."_SESSION['success'] = FALSE;
+				} else {
+					$"."_SESSION['message'] = 'Operation executed successfully!';
+					$"."_SESSION['success'] = TRUE;
+				}";
 			$save .= "?>";
 
 			$footer ='
@@ -473,6 +529,16 @@ $message .= "<li>Created data.php to have all functions ready.</li>";
 
 copy($library."style.css", $path."/includes/style.css");
 $message .= "<li>Created style.css for styling</li></ul>";
+
+// check if not all tables had primary keys and report those whose pages were not created
+if (!empty($loop_no_key_tables)) {
+	$message .= "Unbale to create CRUD functionality for the following tables due to absence primary keys: <ul>";
+	foreach ($loop_no_key_tables as $tbl) {
+		$message .= "<li>Table name: ".$tbl."</li>";
+	}
+
+	$message .= "</ul>";
+}
 
 echo json_encode(array('status' => 'finished','message'=> '<h1>Finished!</h1><h3>Username: admin<br> Password: admin<br><br><a href="'.$path.'" target="_blank">Visit the Admin Panel <i class="glyphicon glyphicon-new-window"></i></a></h3><br><br>'.$message));
 

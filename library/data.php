@@ -37,8 +37,8 @@ function counting($table, $what){
 	return $num;
 }
 
-function getById($table, $id){
-	$query = "SELECT * FROM ".$table." WHERE id=".$id." ";
+function getById($table, $id, $idname){
+	$query = "SELECT * FROM ".$table." WHERE ".$idname."=".$id." ";
 	$result = qSELECT($query);
 	if($result) return $result[0];
 	else return $result;
