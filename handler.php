@@ -96,7 +96,7 @@ if($_POST) {
 		mysqli_query($link, "INSERT INTO `users` (`id`, `name`, `email`, `password`, `role`) VALUES (1, 'Admin', 'admin', '21232f297a57a5a743894a0e4a801fc3', 1)");
 
 		// loop to show all the tables and fields
-		$loop = mysqli_query($link, "SHOW tables FROM $database");
+		$loop = mysqli_query($link, "SHOW FULL TABLES from $database WHERE Table_Type = 'BASE TABLE'");
 		
 		if (!$loop) {
 			die(json_encode(array('status' => 'error','message'=> 'Couldn\'t select table: ' . mysqli_error($link))));
@@ -221,7 +221,8 @@ if($_POST) {
 				$pkquery = mysqli_query($link, "SELECT column_name AS primary_key
 					FROM information_schema.KEY_COLUMN_USAGE
 					WHERE TABLE_NAME = '".$table_name."' AND 
-					    CONSTRAINT_NAME = 'PRIMARY'");
+						TABLE_SCHEMA = '".$database."' AND 
+					  CONSTRAINT_NAME = 'PRIMARY'");
 				$pkrow = mysqli_fetch_assoc($pkquery);
 				$pkname = $pkrow['primary_key'];
 
