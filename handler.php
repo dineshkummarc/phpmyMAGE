@@ -302,46 +302,203 @@ if($_POST) {
 
 
 				// finding all the columns in a table
-				$row = mysqli_query($link, "SHOW columns FROM " . $table[0])
+				$column_desc = mysqli_query($link, "DESCRIBE " . $table[0])
 					or die ('cannot select table fields');
 
 				// looping in the columns
-				while ($col = mysqli_fetch_array($row)){
+				while ($col = mysqli_fetch_assoc($column_desc)){
 					// data for the table in the show page tableName.php 
-					$head .= "		\t<th>" . ucfirst(str_replace("_", " ", $col[0])) . "</th>\n";
-					$body .= "	\t<td><?php echo $".$table_name."s['" . $col[0] . "']?></td>\n";
+					$head .= "		\t<th>" . ucfirst(str_replace("_", " ", $col['Field'])) . "</th>\n";
+					$body .= "	\t<td><?php echo $".$table_name."s['" . $col['Field'] . "']?></td>\n";
 
-					if($col[3] != "PRI"){
-						if($col[1] == "text"){
+					if($col['Key'] != "PRI"){
+						$col_attributes = array(
+							'data_type' => null,
+							'col_min' => 0,
+							'col_max' => 0,
+							'length' => null,
+							'nullable' => '',
+							'save_nullable' => '',
+							'pattern' => ''
+						);
+						// $col_attributes['nullable'] = ($col['Null'] == 'NO') ? 'required=""' : '';
+						if ($col['Null'] == 'NO') {
+							$col_attributes['save_nullable'] = "$" . $col['Field'] . " = mysqli_real_escape_string($" . "link, $"."_POST[\"" . $col['Field'] . "\"]);\n";
+							$col_attributes['nullable'] = 'required=""';
+						} else {
+							$col_attributes['save_nullable'] = " if (empty($"."_POST[\"" . $col['Field'] . "\"])) {
+									$" . $col['Field'] . " = 'NULL';\n
+								} else {
+									$" . $col['Field'] . " = mysqli_real_escape_string($" . "link, $"."_POST[\"" . $col['Field'] . "\"]);\n
+								}
+							";
+						}
+						if($col['Type'] == "text"){
 
 							// continue the edit page with a text area for a type text column
 							$edit .= "
-							<label>" . ucfirst(str_replace("_", " ", $col[0])) . "</label>
-							<textarea class=\"ckeditor form-control\" name=\"" . $col[0] . "\"><?=$".$table_name."['" . $col[0] . "']?></textarea><br>
+							<label>" . ucfirst(str_replace("_", " ", $col['Field'])) . "</label>
+							<textarea class=\"ckeditor form-control\" name=\"" . $col['Field'] . "\" " . $col_attributes['nullable'] . "><?=$".$table_name."['" . $col['Field'] . "']?></textarea><br>
 							";
 						} else {
+							// get the data type
+							$matches = null;
+
+							if (preg_match('/((?:tiny|small|medium|big)?int(?:eger)?)(?:\((\d+)\))?/', $col['Type'], $matches)) {
+								// match: INTEGER values
+								$col_attributes['data_type'] = 'number';
+								// set data length
+								$exp = (int)$matches[2];
+								if ($exp) {
+									$col_attributes['col_min'] = -(2**($exp - 1));
+									$col_attributes['col_max'] = (2**($exp - 1)) - 1;
+								} else {
+									switch ($matches[1]) {
+										case 'tinyint':
+										case 'TINYINT':
+											$col_attributes['col_min'] = -128;
+											$col_attributes['col_max'] = 127;
+											break;
+										case 'smallint':
+										case 'SMALLINT':
+											$col_attributes['col_min'] = -32768;
+											$col_attributes['col_max'] = 32767;
+											break;
+										case 'mediumint':
+										case 'MEDIUMINT':
+											$col_attributes['col_min'] = -8388608;
+											$col_attributes['col_max'] = 8388607;
+											break;
+										case 'integer':
+										case 'INTEGER':
+											$col_attributes['col_min'] = -2147483648;
+											$col_attributes['col_max'] = 2147483647;
+											break;
+										case 'bigint':
+										case 'BIGINT':
+											$col_attributes['col_min'] = -(2**63);
+											$col_attributes['col_max'] = (2**63) - 1;
+											break;
+										default:
+											$col_attributes['col_min'] = 0;
+											$col_attributes['col_max'] = 0;
+											break;
+									}
+								}
+								$col_attributes['length'] = ' min="' . $col_attributes['col_min'] . '" max="' . $col_attributes['col_max'] . '" step="1" ';
+							} elseif (preg_match('/(decimal|numeric)(?:\((\d+)?,(\d+)?\))?/', $col['Type'], $matches)) {
+								// match: floating point values
+								$col_attributes['data_type'] = 'number';
+								$num_m = ((int)$matches[2]) ? (int)$matches[2] : 10;
+								$num_d = ((int)$matches[3]) ? (int)$matches[3] : 0;
+								$num_step = 1/(10**$num_d);
+								$col_attributes['col_min'] = -(10**($num_m - $num_d)) + 1;
+								$col_attributes['col_max'] = -$col_attributes['col_min'];
+								$col_attributes['length'] = ' min="' . $col_attributes['col_min'] . '" max="' . $col_attributes['col_max'] . '" step="' . $num_step . '"';
+							} elseif (preg_match('/char(?:\((\d+)\))?/', $col['Type'], $matches)) {
+								// match: CHAR values
+								$col_attributes['data_type'] = 'text';
+								$col_length = ((int)$matches[1]) ? ((int)$matches[1]) : 64;
+								$col_attributes['length'] = ' minlength="0" maxlength="' . $col_length . '" ';
+							} elseif (preg_match('/varchar(?:\((\d+)\))?/', $col['Type'], $matches)) {
+								// match: VARCHAR values
+								$col_attributes['data_type'] = 'text';
+								$col_length = ((int)$matches[1]) ? ((int)$matches[1]) : 65535;
+								$col_attributes['length'] = ' minlength="0" maxlength="' . $col_length . '" ';
+							} elseif (preg_match('/bit(?:\((\d+)\))?/', $col['Type'], $matches)) {
+								// match: BIT values
+								$col_attributes['data_type'] = 'text';
+								$col_length = ((int)$matches[1]) ? ((int)$matches[1]) : 64;
+								$col_attributes['length'] = ' minlength="0" maxlength="' . $col_length . '" ';
+							} elseif (preg_match('/((?:tiny|medium|big)?text)(?:\((\d+)\))?/', $col['Type'], $matches)) {
+								// match: TEXT values
+								$col_attributes['data_type'] = 'text';
+								// set data length
+								$col_attributes['col_min'] = 0;
+								if ((int)$matches[2]) {
+									$col_attributes['col_max'] = (int)$matches[2];
+								} else {
+									switch ($matches[1]) {
+										case 'tinytext':
+										case 'TINYTEXT':
+											$col_attributes['col_max'] = 2**8;
+											break;
+										case 'text':
+										case 'TEXT':
+											$col_attributes['col_max'] = 2**16;
+											break;
+										case 'mediumtext':
+										case 'MEDIUMTEXT':
+											$col_attributes['col_max'] = 2**24;
+											break;
+										case 'bigtext':
+										case 'BIGTEXT':
+											$col_attributes['col_max'] = 2**32;
+											break;
+										default:
+											$col_attributes['col_max'] = 0;
+											break;
+									}
+								}
+								$col_attributes['length'] = ' minlength="' . $col_attributes['col_min'] . '" maxlength="' . $col_attributes['col_max'] . '" ';
+							}elseif (preg_match('/(date|datetime|timestamp|time|year)(?:\((\d+)\))?$/', $col['Type'], $matches)) {
+								// match: DATE and TIME values
+								switch ($matches[1]) {
+									case 'date':
+									case 'DATE':
+										$col_attributes['data_type'] = 'date';
+										break;
+									case 'datetime':
+									case 'DATETIME':
+										$col_attributes['data_type'] = 'datetime-local';
+										break;
+									case 'timestamp':
+									case 'TIMESTAMP':
+										$col_attributes['data_type'] = 'datetime-local';
+										break;
+									case 'time':
+									case 'TIME':
+										$col_attributes['data_type'] = 'time';
+										break;
+									case 'year':
+									case 'YEAR':
+										$col_attributes['data_type'] = 'number';
+										$col_attributes['col_min'] = 1901;
+										$col_attributes['col_max'] = 2155;
+										$col_attributes['length'] = ' min="' . $col_attributes['col_min'] . '" max="' . $col_attributes['col_max'] . '" ';
+										break;
+									default:
+										break;
+								} 
+								$col_attributes['col_length'] = '';
+							} 
 							// continue the edit page with an input field
 							$edit .= "
-							<label>" . ucfirst(str_replace("_", " ", $col[0])) . "</label>
-							<input class=\"form-control\" type=\"text\" name=\"" . $col[0] . "\" value=\"<?=$".$table_name."['" . $col[0] . "']?>\" /><br>
+							<label>" . ucfirst(str_replace("_", " ", $col['Field'])) . "</label>
+							<input class=\"form-control\" type=\"" . $col_attributes['data_type'] . "\" name=\"" . $col['Field'] . "\" value=\"<?=$".$table_name."['" . $col['Field'] . "']?>\" " . $col_attributes['nullable'] . " " . $col_attributes['length'] . " " . $col_attributes['pattern'] . "/><br>
 							";
 						}
 					}
 
 					// check if the column is not the ID to create the corresponding save and insert data
-					if ($col[0] != $pkname){
+					if ($col['Field'] != $pkname){
 
-						$save .= "$" . $col[0] . " = mysqli_real_escape_string($" . "link, $"."_POST[\"" . $col[0] . "\"]);\n";
+						$save .= $col_attributes['save_nullable'];
 
-						$insert .= " `" . $col[0] . "` ,";
+						$insert .= " `" . $col['Field'] . "` ,";
 
-						if($col[0] == "password"){
+						if($col['Field'] == "password"){
 							$attach_password = 1;
-							$values .= " '\".md5($" . $col[0] . ").\"',";
+							$values .= " '\".md5($" . $col['Field'] . ").\"',";
 
 						}else{
-							$values .= " '\".$" . $col[0] . ".\"' ,";
-							$update .= " `" . $col[0] . "` =  '\".$" . $col[0] . ".\"' ,";
+							if ($col['Null'] == 'NO') {
+								$values .= " '\".$" . $col['Field'] . ".\"' ,";
+								$update .= " `" . $col['Field'] . "` =  '\".$" . $col['Field'] . ".\"' ,";
+							} else {
+								$values .= " \".$" . $col['Field'] . ".\" ,";
+								$update .= " `" . $col['Field'] . "` =  \".$" . $col['Field'] . ".\" ,";
+							}
 						}
 					}
 
