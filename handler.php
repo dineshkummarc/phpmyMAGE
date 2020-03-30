@@ -324,14 +324,21 @@ if($_POST) {
 							'col_max' => 0,
 							'length' => null,
 							'nullable' => '',
+							'label_nullable' => '',
 							'save_nullable' => '',
 							'pattern' => '',
+<<<<<<< HEAD
 							'options' => null
+=======
+							'options' => null,
+							'multiple' => ''
+>>>>>>> e8a7bcc5e8bb70a33050a4fd7e705119517ffc71
 						);
 						// $col_attributes['nullable'] = ($col['Null'] == 'NO') ? 'required=""' : '';
 						if ($col['Null'] == 'NO') {
 							$col_attributes['save_nullable'] = "$" . $col['Field'] . " = mysqli_real_escape_string($" . "link, $"."_POST[\"" . $col['Field'] . "\"]);\n";
 							$col_attributes['nullable'] = 'required=""';
+							$col_attributes['label_nullable'] = ' *';
 						} else {
 							$col_attributes['save_nullable'] = " if (empty($"."_POST[\"" . $col['Field'] . "\"])) {
 									$" . $col['Field'] . " = 'NULL';\n
@@ -344,8 +351,13 @@ if($_POST) {
 
 							// continue the edit page with a text area for a type text column
 							$edit .= "
+<<<<<<< HEAD
 							<label>" . ucfirst(str_replace("_", " ", $col['Field'])) . "</label>
 							<textarea class=\"ckeditor form-control\" name=\"" . $col['Field'] . "\" " . $col_attributes['nullable'] . "><?=($".$table_name.") ? $".$table_name."['" . $col['Field'] . "'] : ''?></textarea><br>
+=======
+							<label>" . ucfirst(str_replace("_", " ", $col['Field'])) . $col_attributes['label_nullable'] . "</label>
+							<textarea class=\"ckeditor form-control\" name=\"" . $col['Field'] . "\" " . $col_attributes['nullable'] . "><?=$".$table_name."['" . $col['Field'] . "']?></textarea><br>
+>>>>>>> e8a7bcc5e8bb70a33050a4fd7e705119517ffc71
 							";
 						} else {
 							// get the data type
@@ -480,18 +492,39 @@ if($_POST) {
 								} 
 								$col_attributes['col_length'] = '';
 							} elseif (preg_match('/(enum|set)(?:\((.+)\))$/', $col['Type'], $matches)) {
+<<<<<<< HEAD
 								$col_attributes['data_type'] = 'enum';
+=======
+								$col_attributes['data_type'] = $matches['1'];
+>>>>>>> e8a7bcc5e8bb70a33050a4fd7e705119517ffc71
 								$data_options = explode(',', $matches['2']);
 								$col_attributes['options'] = array();
 								foreach ($data_options as $option) {
 									$col_attributes['options'][] = trim($option, " '");
 								}
+<<<<<<< HEAD
+=======
+								if ($matches['1'] == 'set') {
+									$col_attributes['multiple'] = ' multiple="" ';
+									if ($col['Null'] != 'NO') {
+										$col_attributes['save_nullable'] = " if (empty($"."_POST[\"" . $col['Field'] . "\"])) {
+												$" . $col['Field'] . " = 'NULL';\n
+											} else {
+												$" . $col['Field'] . " = \"('\" . mysqli_real_escape_string($" . "link, implode(\",\", $"."_POST[\"" . $col['Field'] . "\"])) . \"')\";\n
+											}
+										";
+									}
+								} else {
+									$col_attributes['multiple'] = "";
+								};
+>>>>>>> e8a7bcc5e8bb70a33050a4fd7e705119517ffc71
 							} else {
 								$col_attributes['data_type'] = 'text';
 							}
 							// continue the edit page with an input field or a select if data type is enum/set
 							if (!$col_attributes['options']) {
 								$edit .= "
+<<<<<<< HEAD
 								<label>" . ucfirst(str_replace("_", " ", $col['Field'])) . "</label>
 								<input class=\"form-control\" type=\"" . $col_attributes['data_type'] . "\" name=\"" . $col['Field'] . "\" value=\"<?=($".$table_name.") ? $".$table_name."['" . $col['Field'] . "'] : ''?>\" " . $col_attributes['nullable'] . " " . $col_attributes['length'] . " " . $col_attributes['pattern'] . "/><br>
 								";
@@ -508,6 +541,26 @@ if($_POST) {
 									$edit .= "<option value=\"" . $option . "\"" . " <?= ($".$table_name."['" . $col['Field'] . "'] == '" . $option . "' ? 'selected' : '' )?> " . ">" . $option . "</option>";
 								}
 								$edit .= "</select>";
+=======
+								<label>" . ucfirst(str_replace("_", " ", $col['Field'])) . $col_attributes['label_nullable'] . "</label>
+								<input class=\"form-control\" type=\"" . $col_attributes['data_type'] . "\" name=\"" . $col['Field'] . "\" value=\"<?=$".$table_name."['" . $col['Field'] . "']?>\" " . $col_attributes['nullable'] . " " . $col_attributes['length'] . " " . $col_attributes['pattern'] . "/><br>
+								";
+							} else {
+								$edit .= "
+								<label>" . ucfirst(str_replace("_", " ", $col['Field'])) . $col_attributes['label_nullable'] . "</label>
+								<select class=\"form-control\" name=\"" . $col['Field'] . (strlen($col_attributes['multiple']) > 1 ? "[]" : "") . "\" value=\"<?=$".$table_name."['" . $col['Field'] . "']?>\" " . $col_attributes['nullable'] . " " . $col_attributes['multiple'] . " >
+								<?php $" . $table_name . "['" . $col['Field'] . "'] = explode(',', $" . $table_name . "['" . $col['Field'] . "']); ?>
+								";
+								// create the 'NULL' option if the column can be NULL
+								if ($col['Null'] == 'YES') {
+									$edit .= "<option value=\"" . ($col_attributes['data_type'] == 'set' ? "" : "NULL") . "\"></option>";
+								}
+								foreach ($col_attributes['options'] as $option) {
+									$edit .= "<option value=\"" . $option . "\"" . " <?= (in_array('" . $option . "', $".$table_name."['" . $col['Field'] . "']) ? 'selected' : '' )?> " . ">" . $option . "</option>
+									";
+								}
+								$edit .= "</select><br>";
+>>>>>>> e8a7bcc5e8bb70a33050a4fd7e705119517ffc71
 							}
 						}
 					}
@@ -525,11 +578,26 @@ if($_POST) {
 
 						}else{
 							if ($col['Null'] == 'NO') {
-								$values .= " '\".$" . $col['Field'] . ".\"' ,";
-								$update .= " `" . $col['Field'] . "` =  '\".$" . $col['Field'] . ".\"' ,";
+								if ($col_attributes['data_type'] == 'set') {
+									$values .= " \".$" . $col['Field'] . ".\" ,";
+									$update .= " `" . $col['Field'] . "` =  \".$" . $col['Field'] . ".\" ,";
+								} else {
+									$values .= " '\".$" . $col['Field'] . ".\"' ,";
+									$update .= " `" . $col['Field'] . "` =  '\".$" . $col['Field'] . ".\"' ,";
+								}
 							} else {
+<<<<<<< HEAD
 								$values .= " \".($" . $col['Field'] . " == 'NULL' ? 'NULL' : \"'$" . $col['Field'] . "'\") . \",";
 								$update .= " `" . $col['Field'] . "` =  \".($" . $col['Field'] . " == 'NULL' ? 'NULL' : \"'$" . $col['Field'] . "'\") . \",";
+=======
+								if ($col_attributes['data_type'] == 'set') {
+									$values .= " \".($" . $col['Field'] . " == 'NULL' ? '(\"\")' : \"$" . $col['Field'] . "\") . \",";
+									$update .= " `" . $col['Field'] . "` =  \".($" . $col['Field'] . " == 'NULL' ? '(\"\")' : \"$" . $col['Field'] . "\") . \",";
+								} else {
+									$values .= " \".($" . $col['Field'] . " == 'NULL' ? 'NULL' : \"'$" . $col['Field'] . "'\") . \",";
+									$update .= " `" . $col['Field'] . "` =  \".($" . $col['Field'] . " == 'NULL' ? 'NULL' : \"'$" . $col['Field'] . "'\") . \",";
+								}
+>>>>>>> e8a7bcc5e8bb70a33050a4fd7e705119517ffc71
 							}
 						}
 					}
