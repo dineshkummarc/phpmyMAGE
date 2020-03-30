@@ -1,5 +1,8 @@
 <?php
 
+
+    ini_set('display_errors', '0');
+
 // header to return JSON to the jQuery Ajax request
 header('Content-Type: application/json');
 
@@ -224,11 +227,12 @@ if($_POST) {
 						TABLE_SCHEMA = '".$database."' AND 
 					  CONSTRAINT_NAME = 'PRIMARY'");
 				$pkrow = mysqli_fetch_assoc($pkquery);
-				$pkname = $pkrow['primary_key'];
 
-				if (!$pkname) {
+				if (!$pkrow) {
 					$loop_no_key_tables[] = $table_name;
 					continue;
+				} else {
+					$pkname = $pkrow['primary_key'];
 				}
 
 				// collecting the contents for the table main page tableName.php
@@ -272,6 +276,8 @@ if($_POST) {
 				if($"."act == \"edit\"){
 					$".$pkname." = $"."_GET['".$pkname."'];
 					$".$table_name." = getById(\"".$table_name."\", $".$pkname.", '".$pkname."');
+				} elseif ($"."act == \"add\"){
+					$".$table_name." = null;
 				}
 				?>
 
@@ -319,7 +325,8 @@ if($_POST) {
 							'length' => null,
 							'nullable' => '',
 							'save_nullable' => '',
-							'pattern' => ''
+							'pattern' => '',
+							'options' => null
 						);
 						// $col_attributes['nullable'] = ($col['Null'] == 'NO') ? 'required=""' : '';
 						if ($col['Null'] == 'NO') {
@@ -338,7 +345,7 @@ if($_POST) {
 							// continue the edit page with a text area for a type text column
 							$edit .= "
 							<label>" . ucfirst(str_replace("_", " ", $col['Field'])) . "</label>
-							<textarea class=\"ckeditor form-control\" name=\"" . $col['Field'] . "\" " . $col_attributes['nullable'] . "><?=$".$table_name."['" . $col['Field'] . "']?></textarea><br>
+							<textarea class=\"ckeditor form-control\" name=\"" . $col['Field'] . "\" " . $col_attributes['nullable'] . "><?=($".$table_name.") ? $".$table_name."['" . $col['Field'] . "'] : ''?></textarea><br>
 							";
 						} else {
 							// get the data type
@@ -411,6 +418,7 @@ if($_POST) {
 								$col_length = ((int)$matches[1]) ? ((int)$matches[1]) : 64;
 								$col_attributes['length'] = ' minlength="0" maxlength="' . $col_length . '" ';
 							} elseif (preg_match('/((?:tiny|medium|big)?text)(?:\((\d+)\))?/', $col['Type'], $matches)) {
+								error_log(implode("|", $matches));
 								// match: TEXT values
 								$col_attributes['data_type'] = 'text';
 								// set data length
@@ -431,8 +439,8 @@ if($_POST) {
 										case 'MEDIUMTEXT':
 											$col_attributes['col_max'] = 2**24;
 											break;
-										case 'bigtext':
-										case 'BIGTEXT':
+										case 'longtext':
+										case 'LONGTEXT':
 											$col_attributes['col_max'] = 2**32;
 											break;
 										default:
@@ -471,12 +479,36 @@ if($_POST) {
 										break;
 								} 
 								$col_attributes['col_length'] = '';
-							} 
-							// continue the edit page with an input field
-							$edit .= "
-							<label>" . ucfirst(str_replace("_", " ", $col['Field'])) . "</label>
-							<input class=\"form-control\" type=\"" . $col_attributes['data_type'] . "\" name=\"" . $col['Field'] . "\" value=\"<?=$".$table_name."['" . $col['Field'] . "']?>\" " . $col_attributes['nullable'] . " " . $col_attributes['length'] . " " . $col_attributes['pattern'] . "/><br>
-							";
+							} elseif (preg_match('/(enum|set)(?:\((.+)\))$/', $col['Type'], $matches)) {
+								$col_attributes['data_type'] = 'enum';
+								$data_options = explode(',', $matches['2']);
+								$col_attributes['options'] = array();
+								foreach ($data_options as $option) {
+									$col_attributes['options'][] = trim($option, " '");
+								}
+							} else {
+								$col_attributes['data_type'] = 'text';
+							}
+							// continue the edit page with an input field or a select if data type is enum/set
+							if (!$col_attributes['options']) {
+								$edit .= "
+								<label>" . ucfirst(str_replace("_", " ", $col['Field'])) . "</label>
+								<input class=\"form-control\" type=\"" . $col_attributes['data_type'] . "\" name=\"" . $col['Field'] . "\" value=\"<?=($".$table_name.") ? $".$table_name."['" . $col['Field'] . "'] : ''?>\" " . $col_attributes['nullable'] . " " . $col_attributes['length'] . " " . $col_attributes['pattern'] . "/><br>
+								";
+							} else {
+								$edit .= "
+								<label>" . ucfirst(str_replace("_", " ", $col['Field'])) . "</label>
+								<select class=\"form-control\" name=\"" . $col['Field'] . "\" value=\"<?=$".$table_name."['" . $col['Field'] . "']?>\" " . $col_attributes['nullable'] . " >
+								";
+								// create the 'NULL' option if the column can be NULL
+								if ($col['Null'] == 'YES') {
+									$edit .= "<option value=\"NULL\"></option>";
+								}
+								foreach ($col_attributes['options'] as $option) {
+									$edit .= "<option value=\"" . $option . "\"" . " <?= ($".$table_name."['" . $col['Field'] . "'] == '" . $option . "' ? 'selected' : '' )?> " . ">" . $option . "</option>";
+								}
+								$edit .= "</select>";
+							}
 						}
 					}
 
@@ -496,8 +528,8 @@ if($_POST) {
 								$values .= " '\".$" . $col['Field'] . ".\"' ,";
 								$update .= " `" . $col['Field'] . "` =  '\".$" . $col['Field'] . ".\"' ,";
 							} else {
-								$values .= " \".$" . $col['Field'] . ".\" ,";
-								$update .= " `" . $col['Field'] . "` =  \".$" . $col['Field'] . ".\" ,";
+								$values .= " \".($" . $col['Field'] . " == 'NULL' ? 'NULL' : \"'$" . $col['Field'] . "'\") . \",";
+								$update .= " `" . $col['Field'] . "` =  \".($" . $col['Field'] . " == 'NULL' ? 'NULL' : \"'$" . $col['Field'] . "'\") . \",";
 							}
 						}
 					}
