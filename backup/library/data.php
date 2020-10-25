@@ -14,7 +14,11 @@ function mysqli_result($res,$row=0,$col=0){
 function qSELECT($query, $object = NULL){
 	global $link;
 	$result = mysqli_query($link, $query);
+<<<<<<< HEAD:backup/library/data.php
 	$return = [];
+=======
+	$return = array();
+>>>>>>> old/master:library/data.php
 	if($result){
 		$num = mysqli_num_rows($result);
 		for ($i=0; $i<$num; $i++){
@@ -37,8 +41,8 @@ function counting($table, $what){
 	return $num;
 }
 
-function getById($table, $id){
-	$query = "SELECT * FROM ".$table." WHERE id=".$id." ";
+function getById($table, $id, $idname){
+	$query = "SELECT * FROM ".$table." WHERE ".$idname."=".$id." ";
 	$result = qSELECT($query);
 	if($result) return $result[0];
 	else return $result;
